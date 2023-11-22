@@ -10,6 +10,6 @@ const pinia = createPinia()
 
 app.use(pinia)
 
-console.log("version 1")
+console.log("version 0")
 
 app.mount('#app')

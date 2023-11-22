@@ -1,12 +1,19 @@
+<script setup lang="ts">
+const blockRockingUrl = './count_10_av_60fps.mp4';
+// import blockRockingUrl from './block_rocking.mp4';
+// const blockRockingUrl = new URL(`/block_rocking.mp4`, import.meta.url).href
+</script>
+
 <template>
   <div id="canvasContainer">
     <canvas id="p5Canvas" width="1280" height="720" abitrary-prop="somethi"></canvas>
     <canvas id="threeCanvas" width="1280" height="720" abitrary-prop="somethi"></canvas>
   </div>
-  <video id="video" width="640" height="360" controls src="/block_rocking.mp4"></video>
+  <video id="video" width="640" height="360" controls :src="blockRockingUrl"></video>
   <div id="wavesurferHolder"></div>
   <button id="wavesurferPlay">Play/Pause</button>
   <div id="debugInfo"></div>
+  <div id="teleportTarget"></div>
 </template>
 
 

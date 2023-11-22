@@ -3,33 +3,43 @@
 import { type DevelopmentAppState } from './developmentAppState';
 import p5 from 'p5';
 import * as THREE from 'three'
-import { inject, onMounted, onUnmounted } from 'vue';
+import { inject, onMounted, onUnmounted, ref } from 'vue';
 import * as a from './planeAnimations'
 import { groupedAnimation0 } from './modularizedTransforms';
-import { xyZip, sin, cos, EventChop, steps, now } from '@/channels/channels';
-import { CanvasPaint, type ShaderEffect } from '@/rendering/shaderFX';
+import { xyZip, sinN, cosN, EventChop, steps, now, launch, Ramp, sin, cos, CancelablePromisePoxy, TimeContext } from '@/channels/channels';
+import { CanvasPaint, Passthru, type ShaderEffect } from '@/rendering/shaderFX';
 import { MediaAudioAnalyzer } from '@/rendering/VideoAudioAnalyzer';
 import WaveSurfer from 'wavesurfer.js'
 import { FeedbackZoom, Wobble } from '@/rendering/customFX';
 import { midiInputs } from '@/io/midi';
 import { Three5 } from '@/rendering/three5';
 import { FPS } from '@/rendering/fps';
+import { LineStyle } from '@/rendering/three5Style';
+import { Scale } from '@/music/scale';
+import { clipToDeltas, listToClip, note } from '@/music/clipPlayback';
+import { sampler } from '@/music/synths';
+import { clearListeners, mousedownEvent, targetToP5Coords } from '@/io/keyboardAndMouse';
+import AutoUI from '@/components/AutoUI.vue';
+import studio from '@theatre/studio'
+import { getProject, types } from '@theatre/core';
+import { anim0 } from './animations'
+import { getAnimPos, type TheatreSequence } from '@/animation/beziers'
 
-const fps = new FPS()
+
+const p = getAnimPos("aa", 0.5, anim0.sheetsById['sheet 1'].sequence)
 
 const appState = inject<DevelopmentAppState>('appState')!!
-
-const reg = (i: number) => appState.regions.list[i] 
-
-const norm  = ({x, y}: {x: number, y: number}) => ({x: x * appState.p5Instance!!.width, y: y * appState.p5Instance!!.height})
-
-const aseq = (animations: a.AnimationSegment[]) => {
-  return new a.AnimationSeq(animations)
-}
 
 let shaderGraphEndNode: ShaderEffect | undefined = undefined
 
 let three5i: Three5 | undefined = undefined
+
+let timeLoops: CancelablePromisePoxy<any>[] = []
+const launchLoop = (block: (ctx: TimeContext) => Promise<any>): CancelablePromisePoxy<any> => {
+  const loop = launch(block)
+  timeLoops.push(loop)
+  return loop
+}
 
 const reset = () => {
   appState.regions.list.forEach(r => {
@@ -56,7 +66,7 @@ const reset = () => {
 //   container: '#wavesurferHolder',
 //   waveColor: '#4F4A85',
 //   progressColor: '#383351',
-//   url: '/block_rocking.mp3',
+//   url: 'block_rocking.mp3',
 // })
 // document.querySelector('#wavesurferPlay')?.addEventListener('click', () => {
 //   console.log('play/pause')
@@ -79,147 +89,120 @@ onMounted(() => {
 
       const code = () => {
         reset()
-        // reg(0).activate().debug = true
-        // reg(1).activate()
-        // // reg(0).draw2 = cornerPts
 
 
-        // //todo API - streamline assinging stateful animations to regions (avoid specifying index twice)
-        // //need some api for these so you don't have to specify
-        // //the region index twice (once on creation and once on assignment)
-        // const dots = new a.PerimiterDots(reg(0), 10).anim(2.52)
-        // reg(0).animationSeq = aseq([dots, rl, lr])
+        const circleDef = {
+          x: 0.5,
+          y: 0.5,
+        }
 
-        //modularize creation of a sequence into a function in a DIFFERENT FILE - module can be livecoded
-        groupedAnimation0(appState, reg(1))
+        const circleDef2 = {
+          x: 0.5,
+          y: 0.5,
+        }
 
-        " " //a way to add "spacing" when reading eval'd code
-
-        // testCancel()
-
-
-        // const ec = new EventChop<{ x: number }>()
-
-
-        //todo API - create cleaner way to set up mouse/keyboard mappings on p5 sketch, make it work with fullscreen
-        // threeCanvas.onmousedown = (ev) => {
-        //   const normalizedX = ev.clientX / threeCanvas.clientWidth
-        //   ec.ramp(1, { x: normalizedX * p5i.width })
-        //   console.log("mouse down")
-        // }
-
-        // const chopDraw = (p5: p5) => {
-        //   ec.samples().forEach((s) => {
-        //     p5.push()
-        //     p5.fill(255, 0, 0)
-        //     p5.circle(s.x, s.val * 700, 130)
-        //     p5.pop()
-        //     // console.log("chop draw", s.val, r)
-        //   })
-        // }
-        // appState.drawFunctions.push(chopDraw)
-
-        /**
-         * todo API - need to streamline api for patterns - goal is to be able
-         * to very quickly livecode different x/y streams to change
-         * instancing behavior of dots
-         * 
-         * idea - "patterns" are just functions that take a phase value
-         *        in [0, 1] and return an output [0, 1]
-         * 
-         * lets you easily create variations cyclic patterns
-         */
-
-        // window.addEventListener('keydown', (ev) => {
-        //   if (ev.key === 'p') {
-        //     appState.paused = !appState.paused
-        //   }
-        // })
-
-        // const patternDraw = (p5: p5) => {
-        //   const sin2 = (p: number) => sin(p * 2.5)
-        //   xyZip(Date.now() / 10000, sin2, cos, 20).forEach((pt) => {
-        //     p5.circle(norm(pt).x, norm(pt).y, 30)
-        //   })
-        // }
-        // appState.drawFunctions.push(patternDraw)
-        // console.log("code ran")
-
-        // vidAudioBands.drawCallback = (low, mid, high) => {
-        //   p5i.push()
-        //   p5i.fill(255, 0, 0)
-        //   p5i.rect(300, 0, low * 300, 100)
-        //   p5i.rect(300, 100, mid * 300, 100)
-        //   p5i.rect(300, 200, high * 300, 100)
-        //   p5i.pop()
-        // }
-        // appState.drawFunctions.push(() => vidAudioBands.draw())
-
-        // waveAudioBands.drawCallback = (low, mid, high) => {
-        //   p5i.push()
-        //   p5i.fill(0, 255, 0)
-        //   p5i.rect(600, 0, low * 300, 100)
-        //   p5i.rect(600, 100, mid * 300, 100)
-        //   p5i.rect(600, 200, high * 300, 100)
-        //   p5i.pop()
-        // }
-        // appState.drawFunctions.push(() => waveAudioBands.draw())
-
-        // console.log("input exists", midiInputs.get('IAC Driver Bus 1'))
-        // midiInputs.get('IAC Driver Bus 1')?.onAllNoteOn((note) => {
-        //   console.log("note on", note)
-        // })
-
-        const wave = (t: number) => sin(now() / 20 + t * 4) * 400 + 200
-        const sinColor = (t: number) => [sin(now() / 10 + t * 4), sin(now() / 10 + t * 3), 0]
-        
         appState.drawFunctions.push(() => {
-          let n = 2
-          // return //todo performance - why does enabling this slow down the framerate so much?
-          const sinX = steps(0, 1, n).map(wave)
-          three5i!!.useStroke = false
-          for (let i = 0; i < n; i++) {
-            const c1 = new THREE.Color(...sinColor(i / n))
-            const c2 = new THREE.Color(...sinColor((i + 1) / n))
+          p5i!!.fill(255, 0, 0)
+          p5i!!.circle(circleDef.x * p5i!!.width, circleDef.y * p5i!!.height, 100)
 
-            const mat2 = three5i!!.createGradientMaterial(c1, c2, 0, 10, 0)
-            three5i!!.setMaterial(mat2)
-            three5i!!.circle(i/n * 1280, sinX[i], 40)
+          p5i!!.fill(0, 255, 0)
+          p5i!!.circle(circleDef2.x * p5i!!.width, circleDef2.y * p5i!!.height, 100)
+        })
+
+        studio.initialize()
+
+        const project = getProject('animation test')
+        const sheet = project.sheet('sheet 1')
+
+        const circleAnimObj = sheet.object('firstCircle', {
+          x: types.number(circleDef.x, { range: [0, 1] }),
+          y: types.number(circleDef.y, { range: [0, 1] }),
+          zoom: types.number(0.01, { range: [0, 0.2] }),
+        })
+
+        const circleAnimObj2 = sheet.object('secondCircle', {
+          x: types.number(circleDef2.x, { range: [0, 1] }),
+          y: types.number(circleDef2.y, { range: [0, 1] }),
+        })
+
+        const fdbkZoom = new FeedbackZoom({ src: p5Canvas })
+
+        const programaticCircle = {
+          x: 0.5,
+          y: 0.5,
+        }
+
+        appState.drawFunctions.push(() => {
+          p5i!!.fill(0, 0, 255)
+          p5i!!.circle(programaticCircle.x * p5i!!.width, programaticCircle.y * p5i!!.height, 100)
+        })
+
+        const seq = studio.createContentOfSaveFile('animation test') as TheatreSequence
+
+        launchLoop(async (ctx) => {
+          const starTime = now()
+          const period = 5
+
+          // eslint-disable-next-line no-constant-condition
+          while (true) {
+            const time = now() - starTime
+            const normTime = (time % period) / period
+            programaticCircle.x = getAnimPos('secondCircle.x', normTime, anim0.sheetsById['sheet 1'].sequence)
+            programaticCircle.y = getAnimPos('secondCircle.y', normTime, anim0.sheetsById['sheet 1'].sequence)
+
+            await ctx.waitFrame()
           }
         })
 
-        for (let c = 0; c < 5; c++) {
-          let n = 100
-          appState.drawFunctions.push(() => {
-            // return
-            const sinX = steps(0, 1, n).map(wave)
-            const pts = steps(0, n, n).map(n => Math.round(n)).map(i => new THREE.Vector2(i/n * 1280, sinX[i] - c * 10 + 100))
+        //@ts-ignore
+        window.writeSaveFile = () => {
+          const saveFile = studio.createContentOfSaveFile('animation test')
+          const saveFileStr = JSON.stringify(saveFile)
+          console.log("saveFileStr", saveFileStr)
+          const blob = new Blob([saveFileStr], { type: 'text/plain;charset=utf-8' })
 
-            three5i!!.curve(pts)
-          })
+          //download file with filename animations_timestamp
+          const a = document.createElement('a')
+          a.download = `animations_${Date.now()}.json`
+          a.href = URL.createObjectURL(blob)
+          a.click()
+          a.remove()
         }
 
-        appState.drawFunctions.push(_ => three5i!!.render(appState.threeRenderer!!))
+        // setInterval(() => {
+        //   sheet.sequence.position = Math.random() * 10
+        // }, 1000)
+
+        // window.saveAnimation = () => {
+        //   studio.createContentOfSaveFile()
+        // }
+
+        circleAnimObj.onValuesChange(({ x, y, zoom }) => {
+          // console.log("updating circle", x, y, zoom)
+          circleDef.x = x
+          circleDef.y = y
+          fdbkZoom.setUniforms({ zoom })
+        })
+
+        circleAnimObj2.onValuesChange(({ x, y }) => {
+          // console.log("updating circle2", x, y)
+          circleDef2.x = x
+          circleDef2.y = y
+        })
+
+
+        
 
         
 
 
-
-
-        appState.drawFunctions.push(() => {
-          fps.frame()
-        })
-
-
-
-        //todo api - p5 draw functions called AFTER shader draw don't show up in the shader - fix or warn about this
-        // const fdbkZoom = new FeedbackZoom({ src: p5Canvas })
         // const wobble = new Wobble({ src: three5i!!.output.texture })
         // wobble.setUniforms({xStrength: 0.01, yStrength: 0.01})
-        // const canvasPaint = new CanvasPaint({ src: wobble }) //todo bug - feeding a canvas as a source doesn't update properly
-        // appState.drawFunctions.push(() => canvasPaint.renderAll(appState.threeRenderer!!))
+        const passthru = new Passthru({ src: fdbkZoom})
+        const canvasPaint = new CanvasPaint({ src: passthru }) 
 
-        // shaderGraphEndNode = canvasPaint
+        shaderGraphEndNode = canvasPaint
+        appState.shaderDrawFunc = () => shaderGraphEndNode!!.renderAll(appState.threeRenderer!!)
       }
 
 
@@ -242,6 +225,8 @@ onMounted(() => {
 
 
 
+
+
 onUnmounted(() => {
   /*todo hotreload - use similar pattern to shaderGraphEndNode?.disposeAll() for hotreloading time loops?
   can wrap launch() function in something that registers loops to a global store, 
@@ -250,68 +235,54 @@ onUnmounted(() => {
   console.log("disposing fx")
   shaderGraphEndNode?.disposeAll()
   three5i?.dispose()
-  fps.remove()
+  clearListeners()
+  timeLoops.forEach(loop => loop.cancel())
+  timeLoops = []
 })
+const uiObj0 = {
+  cat: "cat",
+  someNum: 5,
+  someBool: true,
+  obj1: {
+    someNum: 5,
+    someStr: "str",
+    moaObj: {
+      str2: "a"
+    }
+  }
+}
 
-/*
-more ideas
-- todo wishlist - make "blocks" of code undoable?
- - would involve making property assignments automatically undoable, or
-   having a cleaner api for assigning undoable properties
-   (maybe just setters for props that need undo, with a _ suffix indicating undiability)
-- have undo-tree instead of undo stack and then automatic tree walking sequencers
-- can call some disableAll() function at the start of your script that turns off all regions 
-  so that you can know that your script defines "everything" on the screen
-- can have other types of "drawable objects" that you livecode as well, instead of just 
-  "plane-animations" (eg, like gesture loops)
-- if you can save and recall scripts, they can be like "scenes" - 
-  if you really want, can even snapshot a thumbnail and have a scene selector UI
+const uiObj1 = {
+  cat: "cat2",
+  someNum: 50,
+  someBool: true,
+  diffProp: "diff",
+  obj1: {
+    someNum: 5,
+    someStr: "str",
+    moaObj: {
+      str2: "aaaaa"
+    }
+  }
+}
 
+//todo api - figure out how to dynamically switch stuff out sent to the AutoUI component
+let uiObj: any = uiObj0
 
-- todo wishlist create a "modal drawing" interface with mouse and keyboard - different keys for different
-  drawing modes, and also a way to record loops of drawing and play them back
-  - also be able to save and load these loops to file, create transformed instances of them
-    - go back to "delta list" format for saving gestures to enable this
-
-- create the equivalent of CHOPs to provide data sources for animations
-  - need to think about rethink the API for animation segments
-    - abstractions shouldn't be too deep for newcomers to author their own 
-    - need to be able to bind more generally to any kind of "drawable object"
-      - or at least, need to provide type-safety so you can't bind to the wrong thing
-  - figure out how to bind chops to fx parameters
-  - figure out how to bind chops to live inputs (mouse, keyboard, midi, etc)
-  - create equivalents for event-chop and timer chop
-
-- think about an API for transport controls
-  - play, pause, stop, loop, etc
-  - also, how to bind to these from chops
-  - also, how to bind to these from live inputs (mouse, keyboard, midi, etc)
-  - Use tone.js transport?
-
-- incorporate theater.js for timelining things?
-
-- port over Kotlin structured-timing-loops API into typescript
-  - use tone.js transport for reference timing
-  - implement branch() and wait() functions 
-
-- look into using advanced typescript types to provide more robust way to access
-  channel names for things like event chop where you can have arbitrary metadata
-
-- practical steps
-  - make animations triggerable
-    - do this by having animations run off of an event chop?
-      - have animations take an array of phase values instead of a single one, and
-        run their animation for each val - makes them auto-instancing  
-  - don't actuall need a pattern CHOP, just need pattern generating functions
-    with good API/defaults, driven by a phase value
-
-*/
+let uiObjRef = ref(uiObj)
+let index = 0
+setInterval(() => {
+  // console.log("setting uiObjRef")
+  uiObjRef.value = index++ % 2 === 0 ? uiObj0 : uiObj1
+}, 5000)
 
 </script>
 
 <template>
   <div></div>
+  <Teleport to="#teleportTarget">
+    <AutoUI :object-to-edit="uiObjRef"/>
+  </Teleport>
 </template>
 
 <style scoped></style>
-@/rendering/customFX

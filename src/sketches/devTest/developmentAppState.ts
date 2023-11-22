@@ -1,5 +1,5 @@
 import p5 from 'p5'
-import type { AnimationSeq } from '@/sketches/devTest/planeAnimations'
+import type { AnimationSeq } from './planeAnimations'
 import { Entity, EntityList, UndoableList } from '@/stores/undoCommands'
 import { storedData1 } from './exportedShapes'
 
@@ -182,6 +182,9 @@ export type DevelopmentAppState = {
   codeStack: (() => void)[]
   codeStackIndex: number
   drawFunctions: ((p5: p5) => void)[]
+  oneTimeDrawFuncs: ((p5: p5) => void)[]
+  drawFuncMap: Map<string, (p5: p5) => void>
+  shaderDrawFunc: (() => void) | undefined
   // stats: { begin: () => void, end: () => void, update: () => void }
   paused: boolean
 }
@@ -193,6 +196,9 @@ export const appState: DevelopmentAppState = {
   codeStack: [],
   codeStackIndex: 0,
   drawFunctions: [],
+  oneTimeDrawFuncs: [],
+  drawFuncMap: new Map<string, (p5: p5) => void>(),
+  shaderDrawFunc: undefined,
   // stats: stats,
   paused: false
 } 

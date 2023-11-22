@@ -5,7 +5,7 @@ import { inject, onMounted, onUnmounted } from 'vue';
 import { CanvasPaint, Passthru, type ShaderEffect } from '@/rendering/shaderFX';
 import { clearListeners, mousedownEvent, singleKeydownEvent, mousemoveEvent, targetToP5Coords } from '@/io/keyboardAndMouse';
 import p5 from 'p5';
-import { launch, type CancelablePromisePoxy, type TimeContext, xyZip, cos, sin, Ramp, tri } from '@/channels/channels';
+import { launch, type CancelablePromisePoxy, type TimeContext, xyZip, cosN, sinN, Ramp, tri } from '@/channels/channels';
 
 const appState = inject<ToneSeqAppState>('appState')!!
 let shaderGraphEndNode: ShaderEffect | undefined = undefined
@@ -16,8 +16,6 @@ const launchLoop = (block: (ctx: TimeContext) => Promise<any>): CancelablePromis
   timeLoops.push(loop)
   return loop
 }
-
-//todo template - currently need to change sketch module in App.vue, stateInitializer.ts, and OneShoteCode.vue - can this be consolidated?
 
 const clearDrawFuncs = () => {
   appState.drawFunctions = []
@@ -67,7 +65,7 @@ onMounted(() => {
         p.pop()
       }
 
-      //todo template - should keyboard events be on the window? can the three canvas be focused?
+      //sketchTodo - make these all focus on threeCanvas
       singleKeydownEvent('d', (ev) => {
         appState.drawing = !appState.drawing
         console.log("drawing: " + appState.drawing)
@@ -78,7 +76,6 @@ onMounted(() => {
         }
       })
 
-      //todo bug - circles not being picked up to draw after being created
       singleKeydownEvent('s', (ev) => {
         if (appState.drawing) {
           const newCircle = new PulseCircle(p5Mouse.x, p5Mouse.y, 100)
@@ -91,6 +88,7 @@ onMounted(() => {
 
       let lerpEvt = new Ramp(1)
       let lerpLoop: CancelablePromisePoxy<any> | undefined = undefined
+      //todo bug - lerped circles not triggering properly when crossing playhead
       singleKeydownEvent('f', (ev) => {
         const basePositions = appState.circles.list.map(c => ({ x: c.x, y: c.y }))
         const targetPositions = circleArr(appState.circles.list.length, 300, p5i)
